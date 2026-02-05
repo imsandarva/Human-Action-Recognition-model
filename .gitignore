@@ -2,3 +2,5 @@
 
 venv/
 wisdm_dataset/
+
+*.npz

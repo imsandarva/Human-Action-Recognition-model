@@ -7,9 +7,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Constants
-DATA_PATH = 'processed_wisdm.npz'
-MODEL_PATH = 'har_model.keras'
-BATCH_SIZE, EPOCHS = 32, 10
+DATA_PATH, MODEL_PATH = 'processed_wisdm.npz', 'har_model.keras'
+BATCH_SIZE, EPOCHS, DROPOUT_RATE = 32, 20, 0.3
 
 def load_data(path):
     """Loads preprocessed WISDM data from npz file."""
@@ -18,15 +17,14 @@ def load_data(path):
 
 def prepare_labels(y_train, y_val, y_test):
     """Encodes text labels to integers."""
-    le = LabelEncoder()
-    return le.fit_transform(y_train), le.transform(y_val), le.transform(y_test), le
+    le = LabelEncoder(); return le.fit_transform(y_train), le.transform(y_val), le.transform(y_test), le
 
 def build_cnn(input_shape, num_classes):
     """Defines a lightweight 1D-CNN architecture."""
     model = models.Sequential([
         layers.Input(shape=input_shape),
         layers.Conv1D(64, 3, activation='relu'),
-        layers.Dropout(0.2),
+        layers.Dropout(DROPOUT_RATE),
         layers.Conv1D(64, 3, activation='relu'),
         layers.GlobalMaxPooling1D(),
         layers.Dense(num_classes, activation='softmax')
@@ -35,44 +33,39 @@ def build_cnn(input_shape, num_classes):
     return model
 
 def run_training(model, train_data, val_data):
-    """Trains the model with the given data."""
-    X_train, y_train = train_data
-    X_val, y_val = val_data
-    return model.fit(X_train, y_train, validation_data=(X_val, y_val), batch_size=BATCH_SIZE, epochs=EPOCHS)
+    """Trains model with EarlyStopping."""
+    XT, yT = train_data; XV, yV = val_data
+    es = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=2, restore_best_weights=True)
+    return model.fit(XT, yT, validation_data=(XV, yV), batch_size=BATCH_SIZE, epochs=EPOCHS, callbacks=[es])
 
-def plot_confusion_matrix(y_true, y_pred, labels):
-    """Generates and saves a confusion matrix plot."""
-    cm = confusion_matrix(y_true, y_pred)
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(cm, annot=True, fmt='d', xticklabels=labels, yticklabels=labels, cmap='Blues')
-    plt.xlabel('Predicted'); plt.ylabel('True'); plt.title('Confusion Matrix')
-    plt.savefig('confusion_matrix.png'); plt.close()
+def report_metrics(model, sets, le):
+    """Prints detailed accuracy and metrics for all splits."""
+    for name, (X, y) in sets.items():
+        loss, acc = model.evaluate(X, y, verbose=0)
+        print(f"\n--- {name} Results ---\nAccuracy: {acc:.4f} | Loss: {loss:.4f}")
+        if name == 'Test':
+            y_pred = np.argmax(model.predict(X, verbose=0), axis=1)
+            print("\nClassification Report:\n", classification_report(y, y_pred, target_names=le.classes_))
+            plot_cm(y, y_pred, le.classes_)
 
-def perform_evaluation(model, X_test, y_test, le):
-    """Evaluates the model and reports metrics."""
-    y_pred = np.argmax(model.predict(X_test), axis=1)
-    print("\nAccuracy:", model.evaluate(X_test, y_test, verbose=0)[1])
-    print("\nClassification Report:\n", classification_report(y_test, y_pred, target_names=le.classes_))
-    plot_confusion_matrix(y_test, y_pred, le.classes_)
-
-def save_output(model, path):
-    """Saves the trained model."""
-    model.save(path); print(f"Model saved to {path}")
+def plot_cm(y_true, y_pred, labels):
+    """Saves confusion matrix heatmap."""
+    plt.figure(figsize=(10, 8)); sns.heatmap(confusion_matrix(y_true, y_pred), annot=True, fmt='d', xticklabels=labels, yticklabels=labels, cmap='Blues')
+    plt.xlabel('Predicted'); plt.ylabel('True'); plt.title('Confusion Matrix'); plt.savefig('confusion_matrix.png'); plt.close()
 
 def main():
-    """Main execution flow for HAR model training."""
-    # Step 1: Data acquisition
-    XT, yT, XV, yV, XTe, yTe = load_data(DATA_PATH)
-    # Step 2: Label preparation
+    """Main execution flow for refined HAR model training."""
+    # Data Loading
+    print("Loading data..."); XT, yT, XV, yV, XTe, yTe = load_data(DATA_PATH)
+    # Label Preparation
     yT_enc, yV_enc, yTe_enc, le = prepare_labels(yT, yV, yTe)
-    # Step 3: Model construction
-    model = build_cnn(XT.shape[1:], len(le.classes_))
-    # Step 4: Training execution
+    # Model Construction & Training
+    print("Building and training model with EarlyStopping..."); model = build_cnn(XT.shape[1:], len(le.classes_))
     run_training(model, (XT, yT_enc), (XV, yV_enc))
-    # Step 5: Evaluation & Reporting
-    perform_evaluation(model, XTe, yTe_enc, le)
-    # Step 6: Artifact persistence
-    save_output(model, MODEL_PATH)
+    # Detailed Reporting
+    report_metrics(model, {'Train': (XT, yT_enc), 'Val': (XV, yV_enc), 'Test': (XTe, yTe_enc)}, le)
+    # Model Saving
+    model.save(MODEL_PATH); print(f"\nModel saved to {MODEL_PATH}")
 
 if __name__ == "__main__":
     main()

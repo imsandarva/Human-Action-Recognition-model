@@ -1,42 +1,93 @@
-import json
-import numpy as np
-import tensorflow as tf
+import json, os, joblib, numpy as np, tensorflow as tf
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-import os
-
 from django.shortcuts import render
+from scipy.interpolate import interp1d
 
-# Load model once on startup
-MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'har_model.keras')
-MODEL = tf.keras.models.load_model(MODEL_PATH)
-LABELS = ['Downstairs', 'Jogging', 'Sitting', 'Standing', 'Upstairs', 'Walking']
+# Paths
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+RF_PATH = os.path.join(BASE_DIR, 'rf_baseline.joblib')
+DL_PATH = os.path.join(BASE_DIR, 'har_model.keras')
+STD_PATH = os.path.join(BASE_DIR, 'global_std.json')
+META_PATH = os.path.join(BASE_DIR, 'model_metadata.json')
 
-# Global state for dashboard updates
-LATEST_PREDICTION = {'activity': 'Waiting...', 'confidence': 0.0, 'timestamp': None}
+# Global State
+MODELS = {'rf': None, 'dl': None}
+CONFIG = {'std': None, 'labels': None}
+PREDICTIONS = [] # Last 50 predictions
+
+def load_resources():
+    """Load models and config once on startup."""
+    global MODELS, CONFIG
+    try:
+        if os.path.exists(RF_PATH): MODELS['rf'] = joblib.load(RF_PATH)
+        if os.path.exists(DL_PATH): MODELS['dl'] = tf.keras.models.load_model(DL_PATH)
+        if os.path.exists(STD_PATH):
+            with open(STD_PATH, 'r') as f: CONFIG['std'] = json.load(f)
+        if os.path.exists(META_PATH):
+            with open(META_PATH, 'r') as f: CONFIG['labels'] = json.load(f)['labels']
+    except Exception as e: print(f"Startup Warning: {e}")
+
+load_resources()
+
+def preprocess_window(samples, sampling_rate):
+    """Interpolate, mean-subtract, and scale the sensor window."""
+    samples = np.array(samples)
+    # Resample to 50Hz, 100 samples
+    if len(samples) != 100 or sampling_rate != 50:
+        t_old = np.linspace(0, len(samples)/sampling_rate, len(samples))
+        t_new = np.linspace(0, 2.0, 100)
+        samples = np.column_stack([interp1d(t_old, samples[:, i], kind='linear')(t_new) for i in range(3)])
+    
+    # Per-axis mean subtraction (window-wise)
+    samples = samples - np.mean(samples, axis=0)
+    
+    # Scale by global standard deviation
+    if CONFIG['std']:
+        s_vec = np.array([CONFIG['std']['x'], CONFIG['std']['y'], CONFIG['std']['z']])
+        samples = samples / s_vec
+    
+    # Compute magnitude
+    mag = np.sqrt(np.sum(samples**2, axis=1)).reshape(-1, 1)
+    return np.hstack([samples, mag])
 
 @csrf_exempt
 def predict_activity(request):
-    """API endpoint to predict human activity and update global state."""
-    global LATEST_PREDICTION
-    if request.method != 'POST': return JsonResponse({'error': 'POST only'}, status=405)
+    """Highly specialized inference endpoint for HAR."""
+    if request.method != 'POST': return JsonResponse({'error': 'POST required'}, status=405)
     try:
         data = json.loads(request.body)
-        window = np.array(data['window']).astype('float32')
-        if window.ndim == 2: window = np.expand_dims(window, axis=0)
-        preds = MODEL.predict(window, verbose=0); idx = np.argmax(preds[0])
-        LATEST_PREDICTION = {
-            'activity': LABELS[idx],
-            'confidence': float(preds[0][idx]),
-            'timestamp': tf.timestamp().numpy()
+        window = preprocess_window(data['samples'], data.get('sampling_rate', 50))
+        
+        # RF Prediction (Primary)
+        rf_in = window.reshape(1, -1)
+        rf_probs = MODELS['rf'].predict_proba(rf_in)[0]
+        idx = np.argmax(rf_probs)
+        label = CONFIG['labels'][idx] if CONFIG['labels'] else str(idx)
+        
+        res = {
+            "label": label, "confidence": float(rf_probs[idx]), 
+            "model": "rf", "timestamp": tf.timestamp().numpy().tolist()
         }
-        return JsonResponse({'activity': LABELS[idx], 'confidence': float(preds[0][idx])})
+        
+        # Optional DL Prediction
+        if MODELS['dl']:
+            dl_in = window.reshape(1, 100, 4)
+            dl_pred = MODELS['dl'].predict(dl_in, verbose=0)[0]
+            res["dl_result"] = {"label": CONFIG['labels'][np.argmax(dl_pred)], "confidence": float(np.max(dl_pred))}
+            
+        # Logging & State
+        print(f"[{res['timestamp']}] Prediction: {res['label']} ({res['confidence']:.2f})")
+        PREDICTIONS.append(res)
+        if len(PREDICTIONS) > 50: PREDICTIONS.pop(0)
+        
+        return JsonResponse(res)
     except Exception as e: return JsonResponse({'error': str(e)}, status=400)
 
 def get_latest(request):
-    """Returns the latest activity prediction for polling."""
-    return JsonResponse(LATEST_PREDICTION)
+    """Expose the last 50 predictions."""
+    return JsonResponse({"latest": PREDICTIONS[-1] if PREDICTIONS else None, "history": PREDICTIONS[::-1]})
 
 def dashboard(request):
-    """Renders the premium live dashboard."""
+    """Serve the dashboard page."""
     return render(request, 'dashboard.html')

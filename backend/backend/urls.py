@@ -16,7 +16,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from backendapp import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('har/', views.predict_activity, name='har_predict'),
 ]

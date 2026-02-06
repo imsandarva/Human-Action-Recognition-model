@@ -1,0 +1,37 @@
+openapi: 3.0.0
+info:
+  title: HAR API
+  description: Human Action Recognition API via smartphone accelerometer data.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000
+paths:
+  /har/:
+    post:
+      summary: Predict activity from sensor window
+      description: Accepts a 100x4 sensor data window and returns the predicted activity.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                window:
+                  type: array
+                  items:
+                    type: array
+                    items: {type: number}
+                  example: [[-0.1, 9.8, 0.5, 9.8], [0.0, 9.7, 0.6, 9.7]]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  activity: {type: string}
+                  confidence: {type: number}
+                  all_predictions: {type: object}
+        '400': {description: Bad Request}

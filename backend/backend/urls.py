@@ -21,4 +21,6 @@ from backendapp import views
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('har/', views.predict_activity, name='har_predict'),
+    path('har/latest/', views.get_latest, name='har_latest'),
+    path('dashboard/', views.dashboard, name='dashboard'),
 ]

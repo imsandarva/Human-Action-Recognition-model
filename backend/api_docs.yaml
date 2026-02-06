@@ -4,12 +4,12 @@ info:
   description: Human Action Recognition API via smartphone accelerometer data.
   version: 1.0.0
 servers:
-  - url: http://localhost:8000
+  - url: https://dev.turaapp.com/
 paths:
   /har/:
     post:
-      summary: Predict activity from sensor window
-      description: Accepts a 100x4 sensor data window and returns the predicted activity.
+      summary: Analyze Sensor Stream
+      description: Real-time inference using RF (Primary) and 1D-CNN (Secondary).
       requestBody:
         required: true
         content:
@@ -17,12 +17,30 @@ paths:
             schema:
               type: object
               properties:
-                window:
+                sampling_rate: {type: integer, example: 50}
+                timestamp: {type: integer, example: 1675680000}
+                samples:
                   type: array
-                  items:
-                    type: array
-                    items: {type: number}
-                  example: [[-0.1, 9.8, 0.5, 9.8], [0.0, 9.7, 0.6, 9.7]]
+                  items: {type: array, items: {type: number}}
+                  example: [[-0.1, 9.8, 0.5], [0.0, 9.7, 0.6]]
+      responses:
+        '200':
+          description: Successful Inference
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  label: {type: string}
+                  confidence: {type: number}
+                  model: {type: string}
+                  timestamp: {type: number}
+                  dl_result: {type: object}
+        '400': {description: Validation Error}
+  /har/latest/:
+    get:
+      summary: Retrieve Live Stream State
+      description: Returns the most recent classification and a short temporal history.
       responses:
         '200':
           description: OK
@@ -31,7 +49,5 @@ paths:
               schema:
                 type: object
                 properties:
-                  activity: {type: string}
-                  confidence: {type: number}
-                  all_predictions: {type: object}
-        '400': {description: Bad Request}
+                  latest: {type: object}
+                  history: {type: array, items: {type: object}}

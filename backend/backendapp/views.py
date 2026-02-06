@@ -82,7 +82,11 @@ def predict_activity(request):
         if len(PREDICTIONS) > 50: PREDICTIONS.pop(0)
         
         return JsonResponse(res)
-    except Exception as e: return JsonResponse({'error': str(e)}, status=400)
+    except Exception as e:
+        import traceback
+        print(f"ERROR in /har/: {str(e)}")
+        traceback.print_exc()
+        return JsonResponse({'error': str(e)}, status=400)
 
 def get_latest(request):
     """Expose the last 50 predictions."""

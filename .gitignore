@@ -1,6 +1,8 @@
 
 
 venv/
-wisdm_dataset/
+wisdm_dataset/*
+!wisdm_dataset/.gitkeep
+
 
 *.npz

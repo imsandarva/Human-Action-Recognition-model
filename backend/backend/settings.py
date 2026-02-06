@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-ea*mu6ilu9xd7%s)7vb7@+93=hskbx5jao(&$af!0g09tahi_n
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', 'dev.turaapp.com']
 
 
 # Application definition

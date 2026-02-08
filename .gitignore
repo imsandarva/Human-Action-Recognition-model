@@ -9,4 +9,5 @@ collected_data/*
 
 *.npz
 *.joblib
+*.bak
 

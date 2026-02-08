@@ -15,36 +15,54 @@ SEED = 42; np.random.seed(SEED); tf.random.set_seed(SEED)
 
 def setup():
     """Ensure directories and backups exist."""
+    print(f"--- [START] Setup Environment ---")
     os.makedirs(PLOT_DIR, exist_ok=True)
     for m in [MODEL_RF, MODEL_CNN]:
-        if os.path.exists(m): joblib.dump(joblib.load(m) if m.endswith('joblib') else tf.keras.models.load_model(m), m + '.bak')
+        if os.path.exists(m):
+            backup_path = m + '.bak'
+            print(f"[*] Backing up model {os.path.basename(m)} to {os.path.basename(backup_path)}")
+            joblib.dump(joblib.load(m) if m.endswith('joblib') else tf.keras.models.load_model(m), backup_path)
+    print("--- [DONE] Setup ---")
 
 def load_and_preprocess():
     """Load, group, filter, and normalize collected data."""
+    print(f"\n--- [START] Data Loading & Preprocessing ---")
     with open(META_PATH) as f: labels = json.load(f)['labels']
     with open(STD_PATH) as f: global_std = json.load(f)
+    print(f"[*] Target labels: {labels}")
+    print(f"[*] Global STDs: {global_std}")
     
     label_map = {l: i for i, l in enumerate(labels)}
     all_windows, all_labels, all_orig_files = [], [], []
     
-    for f_path in glob.glob(os.path.join(DATA_DIR, "*.csv")):
+    csv_files = glob.glob(os.path.join(DATA_DIR, "*.csv"))
+    print(f"[*] Found {len(csv_files)} CSV files in {DATA_DIR}")
+
+    for f_path in csv_files:
         df = pd.read_csv(f_path)
+        win_count, drop_count = 0, 0
         for wid, win in df.groupby('window_id'):
             if len(win) != 100: continue
             rate = win['avg_rate'].iloc[0]
-            if rate < 35: continue # Drop low rate windows
-            # Preprocess: subtract mean, divide by global std, compute magnitude
+            if rate < 35: 
+                drop_count += 1
+                continue 
+            
             arr = win[['ax', 'ay', 'az']].values
             arr = (arr - arr.mean(axis=0)) / [global_std['x'], global_std['y'], global_std['z']]
             mag = np.sqrt(np.sum(arr**2, axis=1)).reshape(-1, 1)
             all_windows.append(np.hstack([arr, mag]))
             all_labels.append(label_map[win['label'].iloc[0]])
             all_orig_files.append(os.path.basename(f_path))
+            win_count += 1
+        print(f"  - {os.path.basename(f_path)}: {win_count} windows kept, {drop_count} dropped (<35Hz)")
             
+    print(f"--- [DONE] Total Preprocessed Windows: {len(all_windows)} ---")
     return np.array(all_windows), np.array(all_labels), np.array(all_orig_files), labels
 
 def split_data(X, y, files):
     """80/10/10 chronological split per file."""
+    print(f"\n--- [START] Subject-Wise Stratified Splitting ---")
     train_idx, val_idx, test_idx = [], [], []
     for f in np.unique(files):
         idxs = np.where(files == f)[0]
@@ -52,44 +70,61 @@ def split_data(X, y, files):
         train_idx.extend(idxs[:t]); val_idx.extend(idxs[t:v]); test_idx.extend(idxs[v:])
     
     splits = {'train': (X[train_idx], y[train_idx]), 'val': (X[val_idx], y[val_idx]), 'test': (X[test_idx], y[test_idx])}
+    print(f"[*] Split results: Train={len(train_idx)}, Val={len(val_idx)}, Test={len(test_idx)}")
     with open('collected_splits.json', 'w') as f: json.dump({k: len(v[0]) for k, v in splits.items()}, f)
+    print("--- [DONE] Splits saved to collected_splits.json ---")
     return splits
 
 def evaluate(model, X, y_true, model_name, labels):
     """Evaluate and save confusion matrix."""
+    print(f"[*] Evaluating {model_name}...")
     y_pred = rf_predict(model, X) if 'RF' in model_name else np.argmax(model.predict(X, verbose=0), axis=1)
-    acc, f1 = accuracy_score(y_true, y_pred), f1_score(y_true, y_pred, average='macro')
-    cm = confusion_matrix(y_true, y_pred, normalize='true')
+    acc, f1 = accuracy_score(y_true, y_pred), f1_score(y_true, y_pred, average='macro', zero_division=0)
+    
+    # Ensure all classes are represented in CM and Report
+    all_indices = np.arange(len(labels))
+    cm = confusion_matrix(y_true, y_pred, normalize='true', labels=all_indices)
+    
     plt.figure(figsize=(8, 6)); sns.heatmap(cm, annot=True, fmt='.2f', xticklabels=labels, yticklabels=labels, cmap='Blues')
     plt.title(f"{model_name} Confusion Matrix"); plt.tight_layout(); plt.savefig(f"{PLOT_DIR}/collected_{model_name.lower().replace(' ', '_')}.png"); plt.close()
-    return {'acc': acc, 'f1': f1, 'report': classification_report(y_true, y_pred, target_names=labels, output_dict=True)}
+    
+    report = classification_report(y_true, y_pred, target_names=labels, labels=all_indices, output_dict=True, zero_division=0)
+    print(f"    - Accuracy: {acc:.4f} | Macro-F1: {f1:.4f}")
+    return {'acc': acc, 'f1': f1, 'report': report}
 
 def rf_predict(rf, X): return rf.predict(X.reshape(len(X), -1))
 
 def finetune_rf(splits, labels):
     """Retrain RF with original + new data."""
+    print(f"\n--- [START] Fine-tuning Random Forest ---")
+    print("[*] Loading original WISDM training data...")
     orig = np.load('processed_wisdm.npz', allow_pickle=True)
     XT = np.vstack([orig['X_train'].reshape(len(orig['X_train']), -1), splits['train'][0].reshape(len(splits['train'][0]), -1)])
     yT = np.concatenate([orig['y_train'], [labels[i] for i in splits['train'][1]]])
+    print(f"[*] Merged Training Set: {len(XT)} samples")
+    
+    print("[*] Training Random Forest model...")
     rf = RandomForestClassifier(n_estimators=100, n_jobs=-1, random_state=SEED).fit(XT, yT)
-    # Map back to indices for evaluation consistency
-    le_map = {l: i for i, l in enumerate(labels)}
-    rf.classes_indexed = np.array([le_map[c] for c in rf.classes_])
-    def predict_indexed(X): return rf.classes_indexed[rf.predict(X.reshape(len(X), -1)).astype(str) == rf.classes_[:, None]].flatten() # Simplified mapping
-    # Overriding predict for indices
+    
     class IndexedRF:
         def __init__(self, rf, labels): self.rf, self.labels, self.pmap = rf, labels, {l: i for i, l in enumerate(labels)}
         def predict(self, X): return np.array([self.pmap[c] for c in self.rf.predict(X)])
+    
     irf = IndexedRF(rf, labels)
     joblib.dump(rf, 'rf_baseline_finetuned.joblib')
+    print("--- [DONE] Random Forest fine-tuned and saved ---")
     return irf
 
 def finetune_cnn(splits, num_classes):
     """Fine-tune CNN with low learning rate."""
+    print(f"\n--- [START] Fine-tuning 1D-CNN ---")
+    print("[*] Loading baseline CNN model...")
     model = tf.keras.models.load_model(MODEL_CNN)
     model.compile(optimizer=tf.keras.optimizers.Adam(1e-4), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-    model.fit(splits['train'][0], splits['train'][1], validation_data=splits['val'], epochs=5, batch_size=16, verbose=0)
+    print("[*] Training on collected data for 5 epochs...")
+    history = model.fit(splits['train'][0], splits['train'][1], validation_data=splits['val'], epochs=5, batch_size=16, verbose=1)
     model.save('har_model_finetuned.keras')
+    print("--- [DONE] CNN fine-tuned and saved ---")
     return model
 
 def plot_bar_chart(res_list, titles, labels):

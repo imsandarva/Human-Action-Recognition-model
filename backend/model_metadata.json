@@ -7,5 +7,6 @@
     "Upstairs",
     "Walking"
   ],
-  "model_type": "rf"
+  "model_type": "rf",
+  "finetuned_on_user_data": true
 }

@@ -92,21 +92,28 @@ def finetune_cnn(splits, num_classes):
     model.save('har_model_finetuned.keras')
     return model
 
+def plot_bar_chart(res_list, titles, labels):
+    """Generate per-class F1 comparison bar chart."""
+    x = np.arange(len(labels)); width = 0.2
+    plt.figure(figsize=(12, 6))
+    for i, (res, title) in enumerate(zip(res_list, titles)):
+        f1s = [res['report'][l]['f1-score'] for l in labels]
+        plt.bar(x + (i-1.5)*width, f1s, width, label=title)
+    plt.xticks(x, labels, rotation=45); plt.ylabel('F1-Score'); plt.title('Per-Class F1 Improvement'); plt.legend(); plt.grid(alpha=0.3)
+    plt.tight_layout(); plt.savefig(f"{PLOT_DIR}/f1_comparison_bar.png", dpi=150); plt.close()
+
 def main():
     setup(); print("Processing data..."); X, y, files, labels = load_and_preprocess()
+    if len(X) < 10: print("Error: Insufficient windows collected (min 10 required). Aborting."); return
     splits = split_data(X, y, files); print(f"Data split: {len(X)} windows total.")
     
     print("Evaluating baselines..."); rf_base = joblib.load(MODEL_RF); cnn_base = tf.keras.models.load_model(MODEL_CNN)
-    # Baseline RF needs a wrapper to return indices if it returns strings
     class BaseRFWrapper:
         def __init__(self, rf, labels): self.rf, self.map = rf, {l: i for i, l in enumerate(labels)}
-        def predict(self, X): 
-            preds = self.rf.predict(X.reshape(len(X), -1))
-            return np.array([self.map[p] for p in preds])
-    brf = BaseRFWrapper(rf_base, labels)
+        def predict(self, X): return np.array([self.map[p] for p in self.rf.predict(X.reshape(len(X), -1))])
     
-    res_brf = evaluate(brf, splits['test'][0], splits['test'][1], "Baseline RF", labels)
-    res_bcnn = evaluate(cnn_base, splits['test'][0], splits['test'][1], "Baseline CNN", labels)
+    res_brf = evaluate(BaseRFWrapper(rf_base, labels), splits['test'][0], splits['test'][1], "Baseline RF", labels)
+    res_bcnn = evaluate(cnn_base, splits['test'][0], splits['test'][1], "Baseline DL", labels)
     
     print("Fine-tuning Random Forest..."); ft_rf = finetune_rf(splits, labels)
     res_ftrf = evaluate(ft_rf, splits['test'][0], splits['test'][1], "Finetuned RF", labels)
@@ -114,28 +121,36 @@ def main():
     print("Fine-tuning CNN..."); ft_cnn = finetune_cnn(splits, len(labels))
     res_ftcnn = evaluate(ft_cnn, splits['test'][0], splits['test'][1], "Finetuned DL", labels)
     
-    summary = pd.DataFrame({
+    plot_bar_chart([res_brf, res_ftrf, res_bcnn, res_ftcnn], ["RF Base", "RF Fine", "DL Base", "DL Fine"], labels)
+    
+    # Save statistics for summary CSV and JSON
+    summary_data = {
         'Metric': ['Accuracy', 'Macro-F1'],
         'RF Baseline': [res_brf['acc'], res_brf['f1']],
         'RF Finetuned': [res_ftrf['acc'], res_ftrf['f1']],
-        'CNN Baseline': [res_bcnn['acc'], res_bcnn['f1']],
-        'CNN Finetuned': [res_ftcnn['acc'], res_ftcnn['f1']]
-    })
-    summary.to_csv('results_collected_summary.csv', index=False)
+        'DL Baseline': [res_bcnn['acc'], res_bcnn['f1']],
+        'DL Finetuned': [res_ftcnn['acc'], res_ftcnn['f1']]
+    }
+    pd.DataFrame(summary_data).to_csv('results_collected_summary.csv', index=False)
     
     with open('baseline_collected_results.json', 'w') as f:
-        json.dump({'rf': {'acc': res_brf['acc'], 'f1': res_brf['f1']}, 'cnn': {'acc': res_bcnn['acc'], 'f1': res_bcnn['f1']}}, f)
+        json.dump({'rf': {'acc': res_brf['acc'], 'f1': res_brf['f1']}, 'dl': {'acc': res_bcnn['acc'], 'f1': res_bcnn['f1']}}, f)
     
     # Update metadata
-    with open(META_PATH, 'r+') as f:
-        meta = json.load(f); meta['finetuned_on_user_data'] = True
-        f.seek(0); json.dump(meta, f, indent=2); f.truncate()
-        
-    print("\nGeneration complete. Producing REPORT_collected.md...")
+    if os.path.exists(META_PATH):
+        with open(META_PATH, 'r+') as f:
+            meta = json.load(f); meta['finetuned_on_user_data'] = True
+            f.seek(0); json.dump(meta, f, indent=2); f.truncate()
+    
     with open('REPORT_collected.md', 'w') as f:
-        f.write(f"# Fine-tuning Report\n\n## Performance Summary\n\n{summary.to_markdown(index=False)}\n\n")
-        f.write("## Visual Interpretation\n- `collected_baseline_rf.png`: Initial performance of WISDM-trained RF on user data.\n")
-        f.write("- `collected_finetuned_rf.png`: Improved boundaries after including user-specific samples.\n")
-        f.write("- `collected_finetuned_dl.png`: CNN adaptation showing deep feature refinement.\n")
+        f.write("# HAR Fine-tuning Report\n\n## Comparison Metrics\n\n")
+        f.write("| Model | Accuracy | Macro-F1 |\n| :--- | :--- | :--- |\n")
+        f.write(f"| RF Baseline | {res_brf['acc']:.4f} | {res_brf['f1']:.4f} |\n")
+        f.write(f"| RF Finetuned | {res_ftrf['acc']:.4f} | {res_ftrf['f1']:.4f} |\n")
+        f.write(f"| DL Baseline | {res_bcnn['acc']:.4f} | {res_bcnn['f1']:.4f} |\n")
+        f.write(f"| DL Finetuned | {res_ftcnn['acc']:.4f} | {res_ftcnn['f1']:.4f} |\n\n")
+        f.write("## Visualizations\n- ![F1 Comparison](plots/f1_comparison_bar.png)\n- ![Finetuned RF CM](plots/collected_finetuned_rf.png)\n")
+    
+    print("\nSuccess! Results in REPORT_collected.md and plots/")
 
 if __name__ == "__main__": main()

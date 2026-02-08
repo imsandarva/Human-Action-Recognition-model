@@ -6,8 +6,8 @@ from scipy.interpolate import interp1d
 
 # Paths
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-RF_PATH = os.path.join(BASE_DIR, 'rf_baseline.joblib')
-DL_PATH = os.path.join(BASE_DIR, 'har_model.keras')
+RF_PATH = os.path.join(BASE_DIR, 'rf_baseline_finetuned.joblib')
+DL_PATH = os.path.join(BASE_DIR, 'har_model_finetuned.keras')
 STD_PATH = os.path.join(BASE_DIR, 'global_std.json')
 META_PATH = os.path.join(BASE_DIR, 'model_metadata.json')
 

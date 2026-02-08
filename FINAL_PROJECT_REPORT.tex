@@ -1,0 +1,475 @@
+\documentclass{article}%
+\usepackage[T1]{fontenc}%
+\usepackage[utf8]{inputenc}%
+\usepackage{lmodern}%
+\usepackage{textcomp}%
+\usepackage{lastpage}%
+\usepackage{geometry}%
+\geometry{margin=1in,a4paper=}%
+\usepackage{graphicx}%
+\usepackage{subcaption}%
+\usepackage{float}%
+\usepackage{booktabs}%
+\usepackage[hidelinks]{hyperref}%
+\usepackage{tocloft}%
+\usepackage{array}%
+\usepackage{longtable}%
+\usepackage{caption}%
+\usepackage{ragged2e}%
+%
+\title{Human Activity Recognition with Smartphone Sensors}%
+\author{Sandarva Paudel (Roll No: 231733)}%
+\date{February 10, 2026}%
+%
+\begin{document}%
+\normalsize%
+\maketitle%
+\begin{center}%
+\textbf{NEPAL COLLEGE OF INFORMATION TECHNOLOGY}%
+\\%
+Department of Software Engineering%
+\\%
+Course: Data Science and Machine Learning%
+\\%
+Professor: Er. Manil Baidhya%
+\\%
+Semester: 5th Semester%
+\vspace{1cm}%
+\end{center}%
+\section*{Abstract}%
+\label{sec:Abstract}%
+\addcontentsline{toc}{section}{Abstract}%
+This project presents a comprehensive Human Action Recognition (HAR) system that addresses the critical challenge of domain adaptation between laboratory datasets and real{-}world deployment. We leverage the WISDM smartphone accelerometer dataset as a baseline training corpus and implement a dual{-}model architecture combining Random Forest classifiers and 1D Convolutional Neural Networks. The core contribution is a fine{-}tuning methodology that adapts pre{-}trained models to personalized device{-}specific data, achieving a performance improvement from 52\% to 89.33\% accuracy on collected test samples. Through systematic analysis, we identify and mitigate class imbalance issues by removing noisy 'Upstairs' and 'Downstairs' activity classes, resulting in a production{-}ready 4{-}class model optimized for Walking, Jogging, Sitting, and Standing recognition. The system demonstrates the practical viability of transfer learning in sensor{-}based activity recognition, with Random Forest achieving 89.33\% accuracy and 90.55\% macro F1{-}score on personalized test data.%
+\vspace{0.5cm}%
+\textbf{Keywords:} Human Action Recognition, Transfer Learning, Fine-tuning, Smartphone Sensors, Random Forest, Convolutional Neural Networks, WISDM Dataset
+
+%
+\newpage%
+\tableofcontents%
+\newpage%
+\listoffigures%
+\newpage%
+\listoftables%
+\newpage%
+\section*{List of Abbreviations}%
+\label{sec:ListofAbbreviations}%
+\addcontentsline{toc}{section}{List of Abbreviations}%
+\begin{tabular}{ll}%
+\textbf{HAR}&Human Action Recognition\\%
+\textbf{WISDM}&Wireless Sensor Data Mining\\%
+\textbf{CNN}&Convolutional Neural Network\\%
+\textbf{RF}&Random Forest\\%
+\textbf{DL}&Deep Learning\\%
+\textbf{CM}&Confusion Matrix\\%
+\textbf{F1}&F1{-}Score\\%
+\textbf{Hz}&Hertz (sampling frequency)\\%
+\textbf{STD}&Standard Deviation\\%
+\end{tabular}%
+\newpage
+
+%
+\section{Introduction}%
+\label{sec:Introduction}%
+\subsection{Problem Statement}%
+\label{subsec:ProblemStatement}%
+Human Action Recognition (HAR) using smartphone sensors has emerged as a critical research domain with applications in healthcare monitoring, fitness tracking, and context{-}aware computing. However, a fundamental challenge persists: models trained on laboratory datasets often exhibit significant performance degradation when deployed on personal devices due to domain shift. This domain shift arises from variations in device placement, sensor characteristics, user{-}specific movement patterns, and environmental conditions. The problem is further exacerbated by class imbalance and the presence of activities that are difficult to distinguish reliably, such as stair climbing activities.
+
+%
+\subsection{Objectives}%
+\label{subsec:Objectives}%
+\begin{enumerate}%
+\item%
+Develop and train baseline HAR models using the WISDM dataset, implementing both traditional machine learning (Random Forest) and deep learning (1D{-}CNN) approaches.%
+\item%
+Collect personalized accelerometer data from smartphone sensors for real{-}world validation and fine{-}tuning.%
+\item%
+Implement a fine{-}tuning methodology to adapt pre{-}trained models to device{-}specific data, measuring performance improvements.%
+\item%
+Identify and mitigate sources of classification error, including class imbalance and noisy activity classes.%
+\item%
+Evaluate the final system performance and provide a production{-}ready model for deployment.%
+\end{enumerate}
+
+%
+\subsection{Scope and Limitations}%
+\label{subsec:ScopeandLimitations}%
+This project focuses on recognizing four core activities: Walking, Jogging, Sitting, and Standing. The scope includes preprocessing of the WISDM dataset, model training, personal data collection, and fine{-}tuning. Limitations include: (1) exclusion of Upstairs and Downstairs activities in the final model due to classification challenges, (2) data collection limited to a single device and user, (3) sampling rate variations between WISDM (20Hz) and collected data (50Hz), and (4) evaluation on a relatively small personalized test set (75 samples). Future work should address orientation invariance, multi{-}user validation, and incorporation of additional sensor modalities.
+
+%
+\section{Literature Review}%
+\label{sec:LiteratureReview}%
+Human Action Recognition using smartphone accelerometers has been extensively studied since the pioneering work by Kwapisz et al. (2010) using the WISDM dataset. Their study demonstrated that simple machine learning classifiers could achieve reasonable accuracy on controlled laboratory data. Subsequent research has explored deep learning architectures, with 1D{-}CNNs showing particular promise for time{-}series sensor data.%
+\vspace{0.3cm}%
+Recent work by Weiss et al. (2019) highlighted the importance of personalization in activity recognition, showing that user{-}specific models significantly outperform generic models. The challenge of domain adaptation between training and deployment environments has been addressed through various transfer learning techniques, including fine{-}tuning pre{-}trained models on small personalized datasets.%
+\vspace{0.3cm}%
+This project builds upon these foundations by implementing a systematic fine{-}tuning approach that combines the benefits of large{-}scale pre{-}training on WISDM with personalized adaptation, addressing the practical deployment gap that limits real{-}world HAR system effectiveness.
+
+%
+\section{Methodology}%
+\label{sec:Methodology}%
+\subsection{Data Source}%
+\label{subsec:DataSource}%
+\textbf{WISDM Dataset:}%
+ The Wireless Sensor Data Mining (WISDM) Activity Prediction Dataset v1.1 was used as the primary training corpus. This dataset contains 1,098,207 raw accelerometer samples collected from 36 users performing 6 activities: Walking, Jogging, Upstairs, Downstairs, Sitting, and Standing. The original data was collected at approximately 20Hz sampling rate with sensors mounted at the waist.%
+\vspace{0.3cm}%
+\textbf{Personal Data Collection:}%
+ Additional data was collected using a smartphone accelerometer at 50Hz sampling rate. Five 5{-}minute recording sessions were conducted for four activities (Walking, Jogging, Sitting, Standing), resulting in 749 preprocessed windows. The device was placed in the front pocket in portrait orientation, representing a realistic deployment scenario.
+
+%
+\subsection{Data Preprocessing Techniques}%
+\label{subsec:DataPreprocessingTechniques}%
+The preprocessing pipeline consisted of the following steps:%
+\begin{enumerate}%
+\item%
+Data Parsing: Raw WISDM text format was parsed into structured format (user, activity, timestamp, x, y, z accelerometer values).%
+\item%
+Data Cleaning: Removed malformed rows, duplicates, and entries with missing values.%
+\item%
+Resampling: Applied uniform resampling to 50Hz for WISDM data and validated 50Hz for collected data using interpolation to handle irregular sampling intervals.%
+\item%
+Windowing: Segmented continuous streams into 2{-}second windows (100 samples at 50Hz) with 50\% overlap for training data and non{-}overlapping windows for collected data.%
+\item%
+Normalization: Each window was mean{-}centered per{-}axis, then scaled by training{-}set global standard deviations: X{-}axis: 6.876, Y{-}axis: 6.740, Z{-}axis: 4.761.%
+\item%
+Feature Engineering: Computed magnitude channel as sqrt(x² + y² + z²) for models requiring it.%
+\item%
+Quality Filtering: Discarded windows with average sampling rate below 35Hz threshold.%
+\item%
+Subject{-}wise Splitting: Used subject{-}wise stratified splitting for WISDM data to ensure robust validation (Train: 36,474 samples, Validation: 7,521 samples, Test: 10,347 samples).%
+\end{enumerate}%
+\vspace{0.3cm}%
+\begin{center}%
+\begin{tabular}{|l|c|}%
+\hline%
+\textbf{Dataset}&\textbf{Total Windows}\\%
+\hline%
+WISDM Processed&53,743\\%
+WISDM Train Split&36,474\\%
+WISDM Test Split&10,347\\%
+Collected Data&749\\%
+Collected Train&599\\%
+Collected Test&75\\%
+\hline%
+\end{tabular}%
+\end{center}%
+\captionof{table}{Dataset Statistics After Preprocessing}
+
+%
+\subsection{Algorithm Definition}%
+\label{subsec:AlgorithmDefinition}%
+\textbf{Random Forest Classifier:}%
+ A Random Forest ensemble was trained on time{-}domain features extracted from each 2{-}second window. Features included statistical measures (mean, standard deviation, minimum, maximum, median) computed for each accelerometer axis (x, y, z) and magnitude, resulting in approximately 20 features per window. The model used 100 decision trees with default scikit{-}learn parameters.%
+\vspace{0.3cm}%
+\textbf{1D Convolutional Neural Network:}%
+ A 1D{-}CNN architecture was designed to process raw accelerometer windows directly. The network consists of: (1) Two 1D convolutional layers with batch normalization and ReLU activation, (2) MaxPooling layers for dimensionality reduction, (3) Dropout layers (0.5) for regularization, (4) Dense layers with softmax output for 6{-}class classification. The model was trained using Adam optimizer with categorical crossentropy loss and early stopping based on validation accuracy.
+
+%
+\subsection{Model Details}%
+\label{subsec:ModelDetails}%
+\textbf{Baseline Training:}%
+ Both models were initially trained on the WISDM training split. The CNN was trained for up to 20 epochs with early stopping patience of 3 epochs. The Random Forest baseline achieved 84.52\% accuracy on WISDM test set, while the CNN achieved 82.95\% accuracy.%
+\vspace{0.3cm}%
+\textbf{Fine{-}tuning Strategy:}%
+ For Random Forest, the original WISDM training data (36,474 samples) was merged with collected training data (599 samples), and the model was retrained on the combined dataset (37,073 total). For the CNN, transfer learning was applied by fine{-}tuning the pre{-}trained model on the merged dataset for 5 epochs with a reduced learning rate. This approach leverages both the general patterns learned from WISDM and the device{-}specific characteristics from personal data.%
+\vspace{0.3cm}%
+\textbf{Class Filtering:}%
+ After identifying poor performance on Upstairs and Downstairs classes (frequent misclassifications), a 4{-}class variant was developed by removing these classes from both training and inference. This significantly improved real{-}world reliability and reduced false positives.
+
+%
+\section{Tools and Technologies Used}%
+\label{sec:ToolsandTechnologiesUsed}%
+\textbf{Programming Languages and Frameworks:}%
+\begin{itemize}%
+\item%
+Python 3.12 {-} Primary development language%
+\item%
+TensorFlow/Keras {-} Deep learning framework for CNN implementation%
+\item%
+scikit{-}learn {-} Machine learning library for Random Forest%
+\item%
+NumPy, Pandas {-} Data manipulation and preprocessing%
+\item%
+Matplotlib, Seaborn {-} Data visualization and plotting%
+\end{itemize}%
+\vspace{0.3cm}%
+\textbf{Development Tools:}%
+\begin{itemize}%
+\item%
+Django {-} Backend API framework for model deployment%
+\item%
+Flutter/Dart {-} Mobile frontend for data collection%
+\item%
+LaTeX {-} Report generation and documentation%
+\item%
+Git {-} Version control%
+\end{itemize}%
+\vspace{0.3cm}%
+\textbf{Devices:}%
+\begin{itemize}%
+\item%
+Smartphone with 3{-}axis accelerometer (50Hz sampling capability)%
+\end{itemize}
+
+%
+\section{Results and Discussion}%
+\label{sec:ResultsandDiscussion}%
+\subsection{Baseline Performance on WISDM Dataset}%
+\label{subsec:BaselinePerformanceonWISDMDataset}%
+Initial training on the WISDM dataset established baseline performance metrics. The Random Forest classifier achieved 84.52\% accuracy on the WISDM test set, while the 1D{-}CNN achieved 82.95\% accuracy with early stopping at epoch 4. These results demonstrate that both approaches are capable of learning discriminative patterns from the laboratory dataset.%
+\vspace{0.3cm}%
+\begin{center}%
+\begin{tabular}{|l|c|c|c|}%
+\hline%
+\textbf{Model}&\textbf{WISDM Test Accuracy}&\textbf{Precision}&\textbf{Recall}\\%
+\hline%
+Random Forest&84.52\%&0.87 (weighted)&0.85 (weighted)\\%
+1D{-}CNN&82.95\%&0.87 (weighted)&0.83 (weighted)\\%
+\hline%
+\end{tabular}%
+\end{center}%
+\captionof{table}{Baseline Model Performance on WISDM Test Set}
+
+%
+\subsection{Domain Shift Analysis}%
+\label{subsec:DomainShiftAnalysis}%
+When evaluated on the collected personal test set (75 samples), both baseline models exhibited significant performance degradation, indicating substantial domain shift between laboratory and real{-}world conditions. The Random Forest baseline dropped to 52.00\% accuracy (macro F1: 0.3750), while the CNN baseline dropped to 30.67\% accuracy (macro F1: 0.2391). This performance gap validates the need for domain adaptation techniques.%
+\vspace{0.3cm}%
+The domain shift can be attributed to several factors: (1) different device placement (waist vs. pocket), (2) different sensor characteristics and calibration, (3) user{-}specific movement patterns, (4) environmental variations, and (5) sampling rate differences (20Hz vs. 50Hz) requiring resampling.
+
+%
+\subsection{Fine{-}tuning Results}%
+\label{subsec:Fine{-}tuningResults}%
+Fine{-}tuning on merged data (WISDM + collected training samples) resulted in substantial performance improvements on the collected test set. The Random Forest model improved from 52.00\% to 89.33\% accuracy, representing a 37.33 percentage point improvement. The macro F1{-}score improved from 0.3750 to 0.9055. Similarly, the CNN improved from 30.67\% to 68.00\% accuracy (macro F1: 0.7222).%
+\vspace{0.5cm}%
+\begin{center}%
+\begin{tabular}{|l|c|c|}%
+\hline%
+\textbf{Model}&\textbf{Accuracy}&\textbf{Macro F1{-}Score}\\%
+\hline%
+\textbf{Random Forest Baseline}&52.00\%&0.3750\\%
+\textbf{Random Forest Fine{-}tuned}&89.33\%&0.9055\\%
+\hline%
+\textbf{CNN Baseline}&30.67\%&0.2391\\%
+\textbf{CNN Fine{-}tuned}&68.00\%&0.7222\\%
+\hline%
+\end{tabular}%
+\end{center}%
+\captionof{table}{Performance Comparison: Baseline vs Fine-tuned Models on Collected Test Set}%
+\vspace{0.5cm}%
+The Random Forest model demonstrated superior performance after fine{-}tuning, achieving near{-}perfect classification on the four core activities. This makes it the recommended model for production deployment due to its combination of high accuracy, interpretability, and low computational requirements suitable for on{-}device inference.
+
+%
+\newpage%
+\subsection{Visual Analysis of Data}%
+\label{subsec:VisualAnalysisofData}%
+\vspace{0.3cm}%
+\textbf{Raw WISDM Dataset Analysis}%
+\vspace{0.2cm}%
+
+
+\begin{figure}[H]%
+\begin{subfigure}[b]{0.48\textwidth}%
+\includegraphics[width=\linewidth]{raw_visuals/Raw WISDM – before preprocessing_activity_count_bar_chart.png}%
+\caption{Activity distribution in raw dataset showing class imbalance}%
+\end{subfigure}%
+\hfill%
+\begin{subfigure}[b]{0.48\textwidth}%
+\includegraphics[width=\linewidth]{raw_visuals/Raw WISDM – before preprocessing_x_accel_vs_time.png}%
+\caption{X{-}axis acceleration time series with irregular sampling}%
+\end{subfigure}%
+\\%
+\vspace{0.3cm}%
+\begin{subfigure}[b]{0.48\textwidth}%
+\includegraphics[width=\linewidth]{raw_visuals/Raw WISDM – before preprocessing_magnitude_vs_time.png}%
+\caption{Magnitude signal demonstrating signal characteristics}%
+\end{subfigure}%
+\hfill%
+\begin{subfigure}[b]{0.48\textwidth}%
+\includegraphics[width=\linewidth]{raw_visuals/Raw WISDM – before preprocessing_sampling_interval_histogram.png}%
+\caption{Sampling interval histogram revealing temporal inconsistencies}%
+\end{subfigure}%
+\caption{Exploratory analysis of raw WISDM dataset before preprocessing.}%
+\label{fig:raw_wisdm}%
+\end{figure}
+
+%
+\newpage%
+\textbf{Collected Personal Data Analysis}%
+\vspace{0.2cm}%
+
+
+\begin{figure}[H]%
+\begin{subfigure}[b]{0.48\textwidth}%
+\includegraphics[width=\linewidth]{collected_data_visuals/activity_count_bar_chart.png}%
+\caption{Distribution of collected activities (4 classes, 749 windows)}%
+\end{subfigure}%
+\hfill%
+\begin{subfigure}[b]{0.48\textwidth}%
+\includegraphics[width=\linewidth]{collected_data_visuals/x_accel_vs_time.png}%
+\caption{X{-}axis acceleration from personal smartphone recordings}%
+\end{subfigure}%
+\\%
+\vspace{0.3cm}%
+\begin{subfigure}[b]{0.48\textwidth}%
+\includegraphics[width=\linewidth]{collected_data_visuals/magnitude_vs_time.png}%
+\caption{Magnitude signal from collected data showing consistent patterns}%
+\end{subfigure}%
+\hfill%
+\begin{subfigure}[b]{0.48\textwidth}%
+\includegraphics[width=\linewidth]{collected_data_visuals/sampling_interval_histogram.png}%
+\caption{Sampling interval distribution validating 50Hz target rate}%
+\end{subfigure}%
+\caption{Analysis of personalized collected accelerometer data.}%
+\label{fig:collected_data}%
+\end{figure}
+
+%
+\newpage%
+\textbf{Processed Data After Filtering (No Stairs)}%
+\vspace{0.2cm}%
+
+
+\begin{figure}[H]%
+\begin{subfigure}[b]{0.48\textwidth}%
+\includegraphics[width=\linewidth]{processed_visuals_no_stairs/cleaned_activity_counts.png}%
+\caption{Cleaned activity distribution after removing Upstairs/Downstairs}%
+\end{subfigure}%
+\hfill%
+\begin{subfigure}[b]{0.48\textwidth}%
+\includegraphics[width=\linewidth]{processed_visuals_no_stairs/cleaned_x_accel.png}%
+\caption{Processed X{-}axis acceleration with uniform 50Hz sampling}%
+\end{subfigure}%
+\\%
+\vspace{0.3cm}%
+\begin{subfigure}[b]{0.48\textwidth}%
+\includegraphics[width=\linewidth]{processed_visuals_no_stairs/cleaned_magnitude.png}%
+\caption{Cleaned magnitude signal after preprocessing pipeline}%
+\end{subfigure}%
+\hfill%
+\begin{subfigure}[b]{0.48\textwidth}%
+\includegraphics[width=\linewidth]{plots/f1_comparison_bar.png}%
+\caption{Per{-}class F1{-}score comparison: baseline vs fine{-}tuned models}%
+\end{subfigure}%
+\caption{Processed data visualization and performance metrics after noise removal.}%
+\label{fig:processed_data}%
+\end{figure}
+
+%
+\newpage%
+\subsection{Confusion Matrix Analysis}%
+\label{subsec:ConfusionMatrixAnalysis}%
+Confusion matrices provide detailed insights into model performance across activity classes. The baseline models show significant confusion, particularly between similar activities and frequent misclassification of activities as Upstairs/Downstairs (classes not present in collected data). After fine{-}tuning, the Random Forest model achieves near{-}perfect diagonal structure, indicating accurate classification across all four core activities.%
+\vspace{0.5cm}%
+
+
+\begin{figure}[H]%
+\begin{subfigure}[b]{0.48\textwidth}%
+\includegraphics[width=\linewidth]{plots/collected_baseline_rf.png}%
+\caption{Random Forest baseline confusion matrix (52\% accuracy)}%
+\end{subfigure}%
+\hfill%
+\begin{subfigure}[b]{0.48\textwidth}%
+\includegraphics[width=\linewidth]{plots/collected_baseline_dl.png}%
+\caption{Deep Learning baseline confusion matrix (30.67\% accuracy)}%
+\end{subfigure}%
+\\%
+\vspace{0.3cm}%
+\begin{subfigure}[b]{0.48\textwidth}%
+\includegraphics[width=\linewidth]{plots/collected_finetuned_rf.png}%
+\caption{Fine{-}tuned Random Forest confusion matrix (89.33\% accuracy)}%
+\end{subfigure}%
+\hfill%
+\begin{subfigure}[b]{0.48\textwidth}%
+\includegraphics[width=\linewidth]{plots/collected_finetuned_dl.png}%
+\caption{Fine{-}tuned CNN confusion matrix (68\% accuracy)}%
+\end{subfigure}%
+\caption{Confusion matrices comparison: baseline models vs fine{-}tuned models on collected test set.}%
+\label{fig:confusion_matrices}%
+\end{figure}
+
+%
+\vspace{0.5cm}%
+The fine{-}tuned Random Forest model demonstrates excellent performance with minimal off{-}diagonal elements, indicating successful adaptation to the personal device characteristics.
+
+%
+\subsection{Additional Performance Metrics}%
+\label{subsec:AdditionalPerformanceMetrics}%
+\vspace{0.3cm}%
+
+
+\begin{figure}[H]%
+\begin{subfigure}[t]{0.49\textwidth}%
+\includegraphics[width=\linewidth]{confusion_matrix_norm.png}%
+\caption{Normalized confusion matrix showing classification probabilities.}%
+\end{subfigure}%
+\hfill%
+\begin{subfigure}[t]{0.49\textwidth}%
+\includegraphics[width=\linewidth]{f1_scores_bar.png}%
+\caption{F1{-}scores by activity class for baseline and fine{-}tuned models.}%
+\end{subfigure}%
+\\%
+\vspace{0.5cm}%
+\begin{subfigure}[b]{0.75\textwidth}%
+\centering%
+\includegraphics[width=\linewidth]{plots/no_stairs_rf_cm.png}%
+\caption{Random Forest confusion matrix after removing Upstairs/Downstairs classes.}%
+\end{subfigure}%
+\caption{Additional performance metrics: (a) Normalized confusion matrix, (b) F1{-}scores, and (c) 4{-}class confusion matrix.}%
+\end{figure}
+
+%
+\newpage%
+\subsection{Key Findings and Discussion}%
+\label{subsec:KeyFindingsandDiscussion}%
+\textbf{1. Effectiveness of Fine{-}tuning:}%
+ The 37.33 percentage point improvement in Random Forest accuracy demonstrates that fine{-}tuning on even a small personalized dataset (599 training samples) can effectively bridge the domain gap between laboratory and real{-}world deployment.%
+\vspace{0.3cm}%
+\textbf{2. Model Selection:}%
+ Random Forest outperformed the CNN after fine{-}tuning (89.33\% vs 68.00\%), suggesting that feature{-}based approaches may be more robust to domain shift when combined with appropriate fine{-}tuning. Additionally, Random Forest offers advantages in interpretability and computational efficiency for mobile deployment.%
+\vspace{0.3cm}%
+\textbf{3. Class Filtering Impact:}%
+ Removing Upstairs and Downstairs classes eliminated a major source of classification error, as these activities were frequently misclassified and not present in the collected data. The 4{-}class model provides a more reliable foundation for production deployment.%
+\vspace{0.3cm}%
+\textbf{4. Limitations:}%
+ The evaluation is limited to a single user and device. Generalization to other users and devices requires further validation. Additionally, the small test set (75 samples) limits statistical confidence, though the results are promising.
+
+%
+\section{Conclusion and Future Work}%
+\label{sec:ConclusionandFutureWork}%
+\subsection{Conclusion}%
+\label{subsec:Conclusion}%
+This project successfully demonstrates the feasibility of adapting laboratory{-}trained HAR models to personalized device{-}specific deployment through fine{-}tuning. The Random Forest model, after fine{-}tuning on merged WISDM and personal data, achieved 89.33\% accuracy and 90.55\% macro F1{-}score on collected test samples, representing a 37.33 percentage point improvement over the baseline. The systematic removal of noisy activity classes (Upstairs/Downstairs) further enhanced production reliability.%
+\vspace{0.3cm}%
+The results validate that transfer learning through fine{-}tuning is an effective strategy for addressing domain shift in sensor{-}based activity recognition. The combination of large{-}scale pre{-}training on public datasets with small{-}scale personalization provides a practical pathway for deploying accurate HAR systems on consumer devices.
+
+%
+\subsection{Future Work}%
+\label{subsec:FutureWork}%
+\begin{enumerate}%
+\item%
+Multi{-}user validation: Extend data collection to multiple users and devices to assess generalization and develop user{-}agnostic adaptation strategies.%
+\item%
+Orientation invariance: Implement data augmentation techniques (random rotations) to make models robust to device orientation changes during deployment.%
+\item%
+Stair activity integration: Collect high{-}quality Upstairs/Downstairs data with proper labeling to reintegrate these classes with improved reliability.%
+\item%
+Real{-}time deployment: Optimize Random Forest inference for on{-}device execution with latency targets below 100ms for real{-}time applications.%
+\item%
+Multi{-}modal fusion: Incorporate additional sensor modalities (gyroscope, magnetometer) to enhance classification accuracy and robustness.%
+\item%
+Active learning: Develop strategies for intelligently selecting which personal samples to collect for maximum fine{-}tuning benefit with minimal data requirements.%
+\end{enumerate}
+
+%
+\section{References}%
+\label{sec:References}%
+\begin{enumerate}%
+\item J. R. Kwapisz, G. M. Weiss, and S. A. Moore, "Activity recognition using cell phone accelerometers," \textit{Proceedings of the Fourth International Workshop on Knowledge Discovery from Sensor Data (at KDD-10)}, Washington DC, 2010. [Online]. Available: \url{http://www.cis.fordham.edu/wisdm/public_files/sensorKDD-2010.pdf}%
+\item J. W. Lockhart, T. Pulickal, and G. M. Weiss, "Applications of Mobile Activity Recognition," \textit{Proceedings of the ACM UbiComp International Workshop on Situation, Activity, and Goal Awareness}, Pittsburgh, PA, 2012.%
+\item G. M. Weiss and J. W. Lockhart, "The Impact of Personalization on Smartphone-Based Activity Recognition," \textit{Proceedings of the AAAI-12 Workshop on Activity Context Representation: Techniques and Languages}, Toronto, CA, 2012.%
+\item G. M. Weiss, K. Yoneda, and T. Hayajneh, "Smartphone and Smartwatch-Based Biometrics Using Activities of Daily Living," \textit{IEEE Access}, vol. 7, pp. 133190--133202, 2019, doi: 10.1109/ACCESS.2019.2941409.%
+\item WISDM Lab, "WISDM Activity Prediction Dataset v1.1," Dec. 2012. [Online]. Available: \url{http://www.cis.fordham.edu/wisdm/}%
+\end{enumerate}
+
+%
+\end{document}

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 
 class ApiService {
@@ -22,5 +23,16 @@ class ApiService {
       } catch (e) { print('Retry ${i+1} failed: $e'); }
     }
     return null;
+  }
+
+  Future<bool> uploadDataset({required File csvFile, required File summaryFile}) async {
+    try {
+      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/upload_dataset/'));
+      request.files.add(await http.MultipartFile.fromPath('csv', csvFile.path));
+      request.files.add(await http.MultipartFile.fromPath('summary', summaryFile.path));
+      final res = await request.send().timeout(const Duration(seconds: 30));
+      return res.statusCode >= 200 && res.statusCode < 300;
+    } catch (e) { print('Upload failed: $e'); }
+    return false;
   }
 }

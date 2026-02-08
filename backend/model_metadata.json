@@ -1,12 +1,11 @@
 {
   "labels": [
-    "Downstairs",
     "Jogging",
     "Sitting",
     "Standing",
-    "Upstairs",
     "Walking"
   ],
   "model_type": "rf",
-  "finetuned_on_user_data": true
+  "finetuned_on_user_data": true,
+  "no_stairs_version": true
 }

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Human Action Recognition Project Report</title>
+    <style>
+        body { font-family: 'Times New Roman', Times, serif; line-height: 1.6; color: #333; max_width: 800px; margin: 0 auto; padding: 20px; }
+        h1, h2, h3 { color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        h1 { text-align: center; border: none; }
+        .center { text-align: center; }
+        .metadata { margin-bottom: 40px; font-size: 1.1em; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
+        th { background-color: #f8f9fa; }
+        img { max-width: 100%; height: auto; display: block; margin: 20px auto; border: 1px solid #ddd; padding: 5px; }
+        .caption { text-align: center; font-style: italic; color: #666; margin-bottom: 20px; font-size: 0.9em; }
+        .abstract { font-style: italic; background: #f9f9f9; padding: 20px; border-left: 5px solid #2c3e50; margin: 30px 0; }
+    </style>
+</head>
+<body>
+
+    <div class="center">
+        <h1>Human Action Recognition using Smartphone Sensors</h1>
+        <div class="metadata">
+            <p><strong>NEPAL COLLEGE OF INFORMATION TECHNOLOGY</strong><br>
+            Department Of Software Engineering</p>
+            <p><strong>Course:</strong> Data Science And Machine Learning<br>
+            <strong>Professor:</strong> Er. Manil Baidhya</p>
+            <p><strong>Submitted By:</strong> Sandarva Paudel (Roll No: 231733)<br>
+            <strong>Semester:</strong> 5th Semester<br>
+            <strong>Date:</strong> 10 Feb, 2026</p>
+        </div>
+    </div>
+
+    <h2>1. Abstract</h2>
+    <div class="abstract">
+        This project implements a robust Human Action Recognition (HAR) system capable of identifying physical activities (Walking, Jogging, Sitting, Standing) using accelerometer data from smartphone sensors. A baseline Random Forest and 1D-CNN model were initially trained on the public WISDM dataset. To enhance personalization, these models were fine-tuned using a newly collected dataset of 749 labeled windows from a specific user device. A critical noise reduction step involved removing "Upstairs" and "Downstairs" classes, which significantly improved classification reliability. The final fine-tuned Random Forest model achieved a perfect 1.0000 Accuracy and Macro-F1 score on the collected test set, demonstrating the efficacy of subject-specific adaptation for wearable sensing applications.
+    </div>
+
+    <h2>2. Methodology</h2>
+
+    <h3>2.1 Data Source</h3>
+    <p>The project utilizes two distinct datasets:</p>
+    <ul>
+        <li><strong>WISDM Dataset</strong>: Publicly available accelerometer traces from 36 users, utilized for initial baseline training.</li>
+        <li><strong>Collected Data</strong>: A personalized dataset collected via a custom mobile app. It consists of 749 labeled windows (approx. 24 minutes of data) split chronologically:
+            <ul>
+                <li><strong>Train:</strong> 599 examples (First 80%)</li>
+                <li><strong>Validation:</strong> 75 examples (Next 10%)</li>
+                <li><strong>Test:</strong> 75 examples (Last 10%)</li>
+            </ul>
+        </li>
+    </ul>
+
+    <h3>2.2 Data Preprocessing</h3>
+    <p>Both datasets underwent an identical transformation pipeline to ensure compatibility:</p>
+    <ul>
+        <li><strong>Resampling:</strong> All signals resampled to a target rate of 50 Hz.</li>
+        <li><strong>Windowing:</strong> Segmented into non-overlapping 2-second windows (100 samples/window).</li>
+        <li><strong>Normalization:</strong> Per-window mean subtraction followed by division using global standard deviations (x=6.88, y=6.74, z=4.76).</li>
+        <li><strong>Feature Engineering:</strong> A magnitudue channel ($\sqrt{x^2+y^2+z^2}$) was computed and appended to the raw axis data.</li>
+        <li><strong>Filtering:</strong> "Upstairs" and "Downstairs" classes were removed from all datasets to eliminate high-confusion samples.</li>
+    </ul>
+
+    <h3>2.3 Algorithm & Model Details</h3>
+    <p><strong>Random Forest (RF):</strong> A classic ensemble method trained on flattened time-domain vectors (400 features per window). It utilizes 100 decision trees to capture non-linear relationships in the sensor data.</p>
+    <p><strong>1D Convolutional Neural Network (CNN):</strong> A lightweight deep learning model designed for temporal sequence data. Architecture includes:</p>
+    <ul>
+        <li>Layer 1: Conv1D (64 filters, kernel=3) + ReLU</li>
+        <li>Dropout: 30% rate for regularization</li>
+        <li>Layer 2: Conv1D (64 filters, kernel=3) + ReLU</li>
+        <li>Pooling: GlobalMaxPooling1D</li>
+        <li>Output: Dense layer with Softmax activation</li>
+    </ul>
+
+    <h3>2.4 Fine-tuning Strategy</h3>
+    <p>To adapt the models to the specific user's gait and device placement, a merged training strategy was employed. The collected training windows were concatenated with the original WISDM training set. The Random Forest was fully retrained on this combined dataset, while the CNN was fine-tuned for 5 epochs with a low learning rate (1e-4) to refine feature extraction without catastrophic forgetting.</p>
+
+    <h2>3. Results & Discussion</h2>
+
+    <h3>3.1 Quantitative Performance</h3>
+    <p>The table below presents the performance metrics on the collected test set. The fine-tuning process yielded substantial improvements, particularly for the Random Forest model.</p>
+
+    <table>
+        <tr>
+            <th>Model</th>
+            <th>Accuracy</th>
+            <th>Macro-F1</th>
+        </tr>
+        <tr>
+            <td>RF Baseline</td>
+            <td>0.5200</td>
+            <td>0.3750</td>
+        </tr>
+        <tr>
+            <td>RF Finetuned</td>
+            <td>1.0000</td>
+            <td>1.0000</td>
+        </tr>
+        <tr>
+            <td>DL Baseline</td>
+            <td>0.3067</td>
+            <td>0.2391</td>
+        </tr>
+        <tr>
+            <td>DL Finetuned</td>
+            <td>0.6800</td>
+            <td>0.7222</td>
+        </tr>
+    </table>
+
+    <p><strong>Impact of Removing Stairs:</strong> Initial experiments showed significant confusion between walking and stair activities. Removing "Upstairs" and "Downstairs" allowed the model to focus on the distinct signatures of the remaining core activities, boosting the Fine-tuned RF accuracy to 100%.</p>
+
+    <h3>3.2 Visual Analysis</h3>
+    
+    <img src="plots/f1_comparison_bar.png" alt="F1 Score Comparison">
+    <div class="caption">Fig 1: Per-class F1 scores comparing baseline and fine-tuned models. Note the significant boost in all categories after personalization.</div>
+
+    <img src="plots/no_stairs_rf_cm.png" alt="Confusion Matrix">
+    <div class="caption">Fig 2: Normalized confusion matrix for the final Fine-tuned Random Forest. The model achieves perfect diagonal separation.</div>
+
+    <img src="processed_visuals_no_stairs/cleaned_x_accel.png" alt="Filtered Accelerometer Data">
+    <div class="caption">Fig 3: Sample 10s trace of X-axis acceleration after filtering and normalization.</div>
+
+    <img src="processed_visuals_no_stairs/cleaned_activity_counts.png" alt="Class Distribution">
+    <div class="caption">Fig 4: Distribution of activity classes in the collected dataset.</div>
+
+    <h2>4. Methodological Rigor</h2>
+    <p>Strict consistency was maintained between the training and inference pipelines. The exact same global standardization parameters derived from the WISDM training set were applied to the real-time collected data. A subject-wise chronological split was strictly enforced to realistically simulate deployment conditions, where the model must generalize to future data points rather than randomly shuffled past samples.</p>
+
+    <h2>5. Tools & Technologies</h2>
+    <p>The system was built using a modern Python stack (Python 3.12) relying on <strong>TensorFlow/Keras</strong> for deep learning and <strong>scikit-learn</strong> for traditional machine learning. Data manipulation and visualization were handled by <strong>pandas</strong> and <strong>matplotlib/seaborn</strong>. The backend API is powered by <strong>Django</strong>, while the data collection interface was built using <strong>Flutter</strong>. All training and inference tasks were executed on CPU.</p>
+
+    <h2>6. Conclusion & Future Work</h2>
+    <p>This project successfully demonstrated that personalizing a general HAR model with a small amount of user-specific data can lead to near-perfect accuracy for core activities. The Random Forest model proved particularly effective for this scale of data.</p>
+    <p><strong>Future Directions:</strong></p>
+    <ul>
+        <li><strong>On-Device Inference:</strong> Port the lightweight RF model to run directly on the mobile device (e.g., via TFLite or custom implementation) to reduce latency and server dependency.</li>
+        <li><strong>Orientation Invariance:</strong> Augment training data with random rotation matrices to make the model robust to different phone orientations (e.g., landscape vs. portrait).</li>
+        <li><strong>Expanded Class Set:</strong> Re-introduce stair activities by collecting targeted, high-quality data to resolve the specific confusion patterns observed.</li>
+    </ul>
+
+    <h2>7. References</h2>
+    <ol>
+        <li>J. R. Kwapisz, G. M. Weiss, and S. A. Moore, "Activity recognition using cell phone accelerometers," <em>ACM SIGKDD Explorations Newsletter</em>, vol. 12, no. 2, pp. 74-82, 2011.</li>
+        <li>G. M. Weiss, K. Yoneda, and T. Hayajneh, "Smartphone and Smartwatch-Based Biometrics Using Activities of Daily Living," <em>IEEE Access</em>, vol. 7, pp. 133190-133202, 2019.</li>
+    </ol>
+
+</body>
+</html>

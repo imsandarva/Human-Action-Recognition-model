@@ -11,3 +11,4 @@ collected_data/*
 *.joblib
 *.bak
 
+thingsToRemove.txt

@@ -20,19 +20,20 @@ def setup_document():
     doc.packages.append(Package('caption'))
     
     # Title Page
-    doc.preamble.append(Command('title', 'Human Activity Recognition with Smartphone Sensors'))
+    doc.preamble.append(Command('title', 'Human Action Recognition with Smartphone Sensors'))
     doc.preamble.append(Command('author', 'Sandarva Paudel (Roll No: 231733)'))
-    doc.preamble.append(Command('date', 'February 10, 2026'))
+    doc.preamble.append(Command('date', '10 February, 2026'))
     doc.append(NoEscape(r'\maketitle'))
     
     with doc.create(Center()) as center:
         center.append(bold("NEPAL COLLEGE OF INFORMATION TECHNOLOGY"))
         center.append(NoEscape(r'\\'))
-        center.append("Department of Software Engineering")
+        center.append("Department Of Software Engineering")
         center.append(NoEscape(r'\\'))
-        center.append("Course: Data Science and Machine Learning")
+        center.append(NoEscape(r'\vspace{0.3cm}'))
+        center.append("Course: Data Science and Machine Learning, Artificial Intelligence and Neural Network")
         center.append(NoEscape(r'\\'))
-        center.append("Professor: Er. Manil Baidhya")
+        center.append("Professor: Er. Manil Baidhya, Er. Rudra Nepal")
         center.append(NoEscape(r'\\'))
         center.append("Semester: 5th Semester")
         center.append(NoEscape(r'\vspace{1cm}'))
@@ -275,7 +276,7 @@ def add_tools_technologies(doc):
     with doc.create(Section('Tools and Technologies Used')):
         doc.append(bold("Programming Languages and Frameworks:"))
         with doc.create(Itemize()) as itemize:
-            itemize.add_item("Python 3.12 - Primary development language")
+            itemize.add_item("Python - Primary development language")
             itemize.add_item("TensorFlow/Keras - Deep learning framework for CNN implementation")
             itemize.add_item("scikit-learn - Machine learning library for Random Forest")
             itemize.add_item("NumPy, Pandas - Data manipulation and preprocessing")
@@ -285,7 +286,7 @@ def add_tools_technologies(doc):
         doc.append(bold("Development Tools:"))
         with doc.create(Itemize()) as itemize:
             itemize.add_item("Django - Backend API framework for model deployment")
-            itemize.add_item("Flutter/Dart - Mobile frontend for data collection")
+            itemize.add_item("Flutter/Dart - Mobile frontend for data collection and testing")
             itemize.add_item("LaTeX - Report generation and documentation")
             itemize.add_item("Git - Version control")
         
@@ -497,35 +498,6 @@ def add_results(doc):
                 "device characteristics."
             )
         
-        with doc.create(Subsection('Additional Performance Metrics')):
-            doc.append(NoEscape(r'\vspace{0.3cm}'))
-            
-            # Combined Figure for 5.6
-            with doc.create(Figure(position='H')) as fig:
-                # Top Row: Normalised CM (Left) and F1 Scores (Right)
-                with fig.create(SubFigure(position='t', width=NoEscape(r'0.49\textwidth'))) as subfig:
-                    if os.path.exists('confusion_matrix_norm.png'):
-                        subfig.add_image('confusion_matrix_norm.png', width=NoEscape(r'\linewidth'))
-                        subfig.add_caption("Normalized confusion matrix showing classification probabilities.")
-                
-                fig.append(NoEscape(r'\hfill'))
-                
-                with fig.create(SubFigure(position='t', width=NoEscape(r'0.49\textwidth'))) as subfig:
-                    if os.path.exists('f1_scores_bar.png'):
-                        subfig.add_image('f1_scores_bar.png', width=NoEscape(r'\linewidth'))
-                        subfig.add_caption("F1-scores by activity class for baseline and fine-tuned models.")
-                
-                fig.append(NoEscape(r'\\'))
-                fig.append(NoEscape(r'\vspace{0.5cm}'))
-                
-                # Bottom Row: No Stairs CM (Centered)
-                with fig.create(SubFigure(position='b', width=NoEscape(r'0.75\textwidth'))) as subfig:
-                    fig.append(NoEscape(r'\centering'))
-                    if os.path.exists('plots/no_stairs_rf_cm.png'):
-                        subfig.add_image('plots/no_stairs_rf_cm.png', width=NoEscape(r'\linewidth'))
-                        subfig.add_caption("Random Forest confusion matrix after removing Upstairs/Downstairs classes.")
-
-                fig.add_caption("Additional performance metrics: (a) Normalized confusion matrix, (b) F1-scores, and (c) 4-class confusion matrix.")
         
         doc.append(NoEscape(r'\newpage'))
         with doc.create(Subsection('Key Findings and Discussion')):
